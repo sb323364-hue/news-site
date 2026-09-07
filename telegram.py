@@ -1,7 +1,7 @@
 import httpx
 from database import predict_importance, count_ratings
 
-BOT_TOKEN = "PUT_NEW_TOKEN_HERE"   # ← замени после revoke
+BOT_TOKEN = "8725608346:AAGZ8ddO1H5ul-DkOugsGnrgucel0tGrNRw"   # ← замени после revoke
 USER_ID = "1400906997"
 THRESHOLD = 0.5   # порог важности
 
