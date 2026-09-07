@@ -25,3 +25,9 @@ async def index(request: Request):
 async def rate(news_id: str, rating: int):
     set_rating(news_id, rating)
     return RedirectResponse("/", status_code=303)
+
+@app.get("/test-telegram")
+async def test_telegram():
+    from telegram import send
+    result = await send("Тестовое сообщение. Если ты это видишь — бот работает!")
+    return {"result": result}
