@@ -1,33 +1,27 @@
-from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from database import init_db, get_news, set_rating
-from scheduler import start
-import os
+import httpx
+from database import predict_importance, count_ratings
+import traceback
 
-app = FastAPI()
-os.makedirs("static", exist_ok=True)
-os.makedirs("templates", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+BOT_TOKEN = "8725608346:AAGZ8ddO1H5ul-DkOugsGnrgucel0tGrNRw"
+USER_ID = "1400906997"
+THRESHOLD = 0.3
 
-@app.on_event("startup")
-async def startup():
-    init_db()
-    start()
+async def send(text):
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={"chat_id": USER_ID, "text": text, "disable_web_page_preview": True}
+            )
+            return r.json()
+    except Exception as e:
+        print("Telegram send error:", e)
+        return None
 
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "news": get_news()})
-
-@app.post("/rate/{news_id}/{rating}")
-async def rate(news_id: str, rating: int):
-    set_rating(news_id, rating)
-    return RedirectResponse("/", status_code=303)
-
-@app.get("/test-telegram")
-async def test_telegram():
-    from telegram import send
-    result = await send("Тестовое сообщение. Если ты это видишь — бот работает!")
-    return {"result": result}
+async def notify_if_important(item):
+    if count_ratings() < 30:
+        return
+    score = predict_importance(item.get("words", []))
+    if score >= THRESHOLD:
+        text = f"🔥 {item['title']}\n{item['url']}\n— {item['source']}"
+        await send(text)
