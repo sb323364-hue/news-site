@@ -8,22 +8,27 @@
 </head>
 <body>
 <div class="container">
-  <h1>Новости</h1>
-  <p class="sub">Программирование · Идеи проектов</p>
+  <header>
+    <h1>Новости</h1>
+    <p class="sub">Программирование · Проекты · Искусство</p>
+  </header>
   {% for n in news %}
   <div class="card">
     <a href="{{ n.url }}" target="_blank" class="title">{{ n.title }}</a>
     {% if n.summary %}<p class="summary">{{ n.summary }}</p>{% endif %}
     <div class="meta">
       <span class="src">{{ n.source }}</span>
-      <form action="/rate/{{ n.id }}/1" method="post" style="display:inline">
-        <button class="btn up" title="Важно">▲</button>
-      </form>
-      <form action="/rate/{{ n.id }}/-1" method="post" style="display:inline">
-        <button class="btn down" title="Не интересно">▼</button>
-      </form>
+      <span class="category {{ n.category }}">{{ n.category }}</span>
       {% if n.rating == 1 %}<span class="tag good">важно</span>{% endif %}
       {% if n.rating == -1 %}<span class="tag bad">не интересно</span>{% endif %}
+      <div class="actions">
+        <form action="/rate/{{ n.id }}/1" method="post" style="display:inline">
+          <button class="btn up" title="Важно">👍</button>
+        </form>
+        <form action="/rate/{{ n.id }}/-1" method="post" style="display:inline">
+          <button class="btn down" title="Не интересно">👎</button>
+        </form>
+      </div>
     </div>
   </div>
   {% else %}
