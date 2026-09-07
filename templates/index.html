@@ -3,37 +3,46 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Новости</title>
+<title>Вдохновение</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <div class="container">
   <header>
-    <h1>Новости</h1>
-    <p class="sub">Программирование · Проекты · Искусство</p>
+    <h1>Вдохновение</h1>
+    <p class="sub">Дизайн · Фотография · Искусство</p>
   </header>
-  {% for n in news %}
-  <div class="card">
-    <a href="{{ n.url }}" target="_blank" class="title">{{ n.title }}</a>
-    {% if n.summary %}<p class="summary">{{ n.summary }}</p>{% endif %}
-    <div class="meta">
-      <span class="src">{{ n.source }}</span>
-      <span class="category {{ n.category }}">{{ n.category }}</span>
-      {% if n.rating == 1 %}<span class="tag good">важно</span>{% endif %}
-      {% if n.rating == -1 %}<span class="tag bad">не интересно</span>{% endif %}
-      <div class="actions">
-        <form action="/rate/{{ n.id }}/1" method="post" style="display:inline">
-          <button class="btn up" title="Важно">👍</button>
-        </form>
-        <form action="/rate/{{ n.id }}/-1" method="post" style="display:inline">
-          <button class="btn down" title="Не интересно">👎</button>
-        </form>
+  <div class="grid">
+    {% for n in news %}
+    <div class="card">
+      {% if n.image_url %}
+      <a href="{{ n.url }}" target="_blank">
+        <img src="{{ n.image_url }}" alt="{{ n.title }}" loading="lazy">
+      </a>
+      {% endif %}
+      <div class="card-content">
+        <a href="{{ n.url }}" target="_blank" class="title">{{ n.title }}</a>
+        {% if n.summary %}<p class="summary">{{ n.summary }}</p>{% endif %}
+        <div class="meta">
+          <span class="src">{{ n.source }}</span>
+          <span class="category {{ n.category }}">{{ n.category }}</span>
+          {% if n.rating == 1 %}<span class="tag good">✓</span>{% endif %}
+          {% if n.rating == -1 %}<span class="tag bad">✗</span>{% endif %}
+          <div class="actions">
+            <form action="/rate/{{ n.id }}/1" method="post" style="display:inline">
+              <button class="btn up" title="Нравится">👍</button>
+            </form>
+            <form action="/rate/{{ n.id }}/-1" method="post" style="display:inline">
+              <button class="btn down" title="Не интересно">👎</button>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
+    {% else %}
+    <p class="empty">Пока нет новостей. Подожди несколько минут.</p>
+    {% endfor %}
   </div>
-  {% else %}
-  <p class="empty">Пока нет новостей. Подожди несколько минут.</p>
-  {% endfor %}
 </div>
 </body>
 </html>
