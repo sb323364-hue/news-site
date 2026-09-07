@@ -18,6 +18,7 @@ def init_db():
             url TEXT,
             source TEXT,
             summary TEXT,
+            image_url TEXT,
             created_at TEXT,
             words TEXT,
             category TEXT
@@ -39,9 +40,10 @@ def save_news(items):
     conn = get_conn()
     for item in items:
         conn.execute(
-            "INSERT OR IGNORE INTO news (id,title,url,source,summary,created_at,words,category) VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT OR IGNORE INTO news (id,title,url,source,summary,image_url,created_at,words,category) VALUES (?,?,?,?,?,?,?,?,?)",
             (item["id"], item["title"], item["url"], item["source"],
-             item.get("summary",""), datetime.utcnow().isoformat(),
+             item.get("summary",""), item.get("image_url",""),
+             datetime.utcnow().isoformat(),
              json.dumps(item.get("words", [])),
              item.get("category",""))
         )
