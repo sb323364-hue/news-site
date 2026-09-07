@@ -1,7 +1,6 @@
 import sqlite3
 import json
 from datetime import datetime
-from collections import Counter
 
 DB_PATH = "news.db"
 
@@ -20,7 +19,8 @@ def init_db():
             source TEXT,
             summary TEXT,
             created_at TEXT,
-            words TEXT
+            words TEXT,
+            category TEXT
         );
         CREATE TABLE IF NOT EXISTS ratings (
             news_id TEXT PRIMARY KEY,
@@ -39,15 +39,16 @@ def save_news(items):
     conn = get_conn()
     for item in items:
         conn.execute(
-            "INSERT OR IGNORE INTO news (id,title,url,source,summary,created_at,words) VALUES (?,?,?,?,?,?,?)",
+            "INSERT OR IGNORE INTO news (id,title,url,source,summary,created_at,words,category) VALUES (?,?,?,?,?,?,?,?)",
             (item["id"], item["title"], item["url"], item["source"],
              item.get("summary",""), datetime.utcnow().isoformat(),
-             json.dumps(item.get("words", [])))
+             json.dumps(item.get("words", [])),
+             item.get("category",""))
         )
     conn.commit()
     conn.close()
 
-def get_news(limit=50):
+def get_news(limit=60):
     conn = get_conn()
     rows = conn.execute(
         "SELECT n.*, r.rating FROM news n LEFT JOIN ratings r ON n.id=r.news_id "
@@ -62,7 +63,6 @@ def set_rating(news_id, rating):
         "INSERT OR REPLACE INTO ratings (news_id, rating, rated_at) VALUES (?,?,?)",
         (news_id, rating, datetime.utcnow().isoformat())
     )
-    # получаем слова новости
     row = conn.execute("SELECT words FROM news WHERE id=?", (news_id,)).fetchone()
     if row:
         words = json.loads(row["words"])
