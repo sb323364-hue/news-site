@@ -2,138 +2,199 @@ import re
 import httpx
 from bs4 import BeautifulSoup
 import feedparser
+import asyncio
+import random
 
 STOPWORDS = set("the a an and or to of in for on with is that this from by as at it be was were are its their you your we our they he she и или но не на в для с по что это как его её их они мы вы он она оно то все эти тот та те".split())
+
+UNSPLASH_KEY = "3M6g8CnURKe2FDLohVFX-qL9WxZq-xmpCSLXEebzYU8"
+PEXELS_KEY = "E3y39aPY2n66afqFL5ceGwDF5HAAzO5bFy5qpt9Kvjpfi4f4PlxcBziY"
+
+SEARCH_TERMS = ["design", "photography", "art", "illustration", "creative", "portrait", "landscape"]
 
 def extract_words(text):
     words = re.findall(r"[a-zA-Zа-яА-Я]+", text.lower())
     return [w for w in words if w not in STOPWORDS and len(w) > 2]
 
-async def fetch_hn():
+async def fetch_unsplash():
     items = []
     async with httpx.AsyncClient(timeout=15) as c:
-        ids = (await c.get("https://hacker-news.firebaseio.com/v0/topstories.json")).json()[:15]
-        for i in ids:
-            try:
-                d = (await c.get(f"https://hacker-news.firebaseio.com/v0/item/{i}.json")).json()
-                if not d or d.get("type") != "story":
-                    continue
-                title = d.get("title","")
-                items.append({
-                    "id": f"hn_{i}",
-                    "title": title,
-                    "url": d.get("url") or f"https://news.ycombinator.com/item?id={i}",
-                    "source": "Hacker News",
-                    "summary": "",
-                    "words": extract_words(title),
-                    "category": "programming"
-                })
-            except Exception:
-                continue
+        try:
+            term = random.choice(SEARCH_TERMS)
+            r = await c.get(
+                f"https://api.unsplash.com/photos/random",
+                params={"count": 20, "query": term},
+                headers={"Authorization": f"Client-ID {UNSPLASH_KEY}"}
+            )
+            if r.status_code == 200:
+                for photo in r.json():
+                    title = photo.get("description") or photo.get("alt_description") or "Untitled"
+                    items.append({
+                        "id": f"unsplash_{photo['id']}",
+                        "title": title,
+                        "url": photo["links"]["html"],
+                        "source": "Unsplash",
+                        "summary": "",
+                        "image_url": photo["urls"]["regular"],
+                        "words": extract_words(title + " " + " ".join(photo.get("tags", [])[:5])),
+                        "category": "photography"
+                    })
+        except Exception as e:
+            print(f"Unsplash error: {e}")
     return items
 
-async def fetch_habr():
+async def fetch_pexels():
+    items = []
+    async with httpx.AsyncClient(timeout=15) as c:
+        try:
+            term = random.choice(SEARCH_TERMS)
+            r = await c.get(
+                f"https://api.pexels.com/v1/search",
+                params={"query": term, "per_page": 20},
+                headers={"Authorization": PEXELS_KEY}
+            )
+            if r.status_code == 200:
+                for photo in r.json().get("photos", []):
+                    items.append({
+                        "id": f"pexels_{photo['id']}",
+                        "title": photo.get("alt") or "Untitled",
+                        "url": photo["url"],
+                        "source": "Pexels",
+                        "summary": "",
+                        "image_url": photo["src"]["large"],
+                        "words": extract_words(photo.get("alt", "")),
+                        "category": "photography"
+                    })
+        except Exception as e:
+            print(f"Pexels error: {e}")
+    return items
+
+async def fetch_colossal():
     items = []
     try:
-        feed = feedparser.parse("https://habr.com/ru/rss/all/?fl=ru")
-        for entry in feed.entries[:20]:
+        feed = feedparser.parse("https://www.colossal.org/feed/")
+        for entry in feed.entries[:15]:
             title = entry.get("title","")
             summary = entry.get("summary","")
             if len(summary) > 200:
                 summary = summary[:200] + "..."
+            
+            # Извлекаем первую картинку из HTML
+            image_url = ""
+            if "content" in entry:
+                soup = BeautifulSoup(entry.content[0].value, "html.parser")
+                img = soup.find("img")
+                if img and img.get("src"):
+                    image_url = img["src"]
+            
             items.append({
-                "id": f"habr_{entry.get('id','')}",
+                "id": f"colossal_{entry.get('id','')}",
                 "title": title,
                 "url": entry.get("link",""),
-                "source": "Хабр",
+                "source": "Colossal",
                 "summary": summary,
+                "image_url": image_url,
                 "words": extract_words(title + " " + summary),
-                "category": "programming"
+                "category": "art"
             })
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Colossal error: {e}")
     return items
 
-async def fetch_devto():
+async def fetch_itsnicethat():
     items = []
-    async with httpx.AsyncClient(timeout=15) as c:
-        try:
-            r = await c.get("https://dev.to/api/articles?top=7&per_page=15")
-            for a in r.json():
-                title = a.get("title","")
-                desc = a.get("description","")
-                items.append({
-                    "id": f"devto_{a['id']}",
-                    "title": title,
-                    "url": a.get("url"),
-                    "source": "Dev.to",
-                    "summary": desc,
-                    "words": extract_words(title + " " + desc + " " + " ".join(a.get("tag_list",[]))),
-                    "category": "programming"
-                })
-        except Exception:
-            pass
+    try:
+        feed = feedparser.parse("https://www.itsnicethat.com/feed/atom")
+        for entry in feed.entries[:15]:
+            title = entry.get("title","")
+            summary = entry.get("summary","")
+            if len(summary) > 200:
+                summary = summary[:200] + "..."
+            
+            image_url = ""
+            if "content" in entry:
+                soup = BeautifulSoup(entry.content[0].value, "html.parser")
+                img = soup.find("img")
+                if img and img.get("src"):
+                    image_url = img["src"]
+            
+            items.append({
+                "id": f"int_{entry.get('id','')}",
+                "title": title,
+                "url": entry.get("link",""),
+                "source": "It's Nice That",
+                "summary": summary,
+                "image_url": image_url,
+                "words": extract_words(title + " " + summary),
+                "category": "design"
+            })
+    except Exception as e:
+        print(f"It's Nice That error: {e}")
     return items
 
-async def fetch_github_trending():
+async def fetch_awwwards():
     items = []
-    async with httpx.AsyncClient(timeout=15, headers={"User-Agent":"Mozilla/5.0"}) as c:
-        try:
-            r = await c.get("https://github.com/trending")
-            soup = BeautifulSoup(r.text, "html.parser")
-            for repo in soup.select("article.Box-row")[:12]:
-                h1 = repo.select_one("h2 a")
-                if not h1:
-                    continue
-                name = h1.get_text(" ", strip=True).replace(" / ", "/")
-                desc = repo.select_one("p")
-                desc_text = desc.get_text(strip=True) if desc else ""
-                url = "https://github.com" + h1.get("href","")
-                items.append({
-                    "id": f"gh_{name.replace('/','_')}",
-                    "title": name,
-                    "url": url,
-                    "source": "GitHub Trending",
-                    "summary": desc_text,
-                    "words": extract_words(name + " " + desc_text),
-                    "category": "projects"
-                })
-        except Exception:
-            pass
+    try:
+        feed = feedparser.parse("https://www.awwwards.com/blog/feed/")
+        for entry in feed.entries[:12]:
+            title = entry.get("title","")
+            summary = entry.get("summary","")
+            if len(summary) > 200:
+                summary = summary[:200] + "..."
+            
+            image_url = ""
+            if "content" in entry:
+                soup = BeautifulSoup(entry.content[0].value, "html.parser")
+                img = soup.find("img")
+                if img and img.get("src"):
+                    image_url = img["src"]
+            
+            items.append({
+                "id": f"awwwards_{entry.get('id','')}",
+                "title": title,
+                "url": entry.get("link",""),
+                "source": "Awwwards",
+                "summary": summary,
+                "image_url": image_url,
+                "words": extract_words(title + " " + summary),
+                "category": "design"
+            })
+    except Exception as e:
+        print(f"Awwwards error: {e}")
     return items
 
-async def fetch_art():
+async def fetch_dribbble():
     items = []
-    rss_feeds = [
-        ("https://www.colossal.org/feed/", "Colossal"),
-        ("https://www.itsnicethat.com/feed/atom", "It's Nice That"),
-        ("https://www.dezeen.com/rss/", "Dezeen"),
-    ]
-    for feed_url, source in rss_feeds:
-        try:
-            feed = feedparser.parse(feed_url)
-            for entry in feed.entries[:8]:
-                title = entry.get("title","")
-                summary = entry.get("summary","")
-                if len(summary) > 180:
-                    summary = summary[:180] + "..."
-                items.append({
-                    "id": f"art_{source}_{entry.get('id','')}",
-                    "title": title,
-                    "url": entry.get("link",""),
-                    "source": source,
-                    "summary": summary,
-                    "words": extract_words(title + " " + summary),
-                    "category": "art"
-                })
-        except Exception:
-            continue
+    try:
+        feed = feedparser.parse("https://dribbble.com/shots/popular.rss")
+        for entry in feed.entries[:15]:
+            title = entry.get("title","")
+            
+            image_url = ""
+            if "content" in entry:
+                soup = BeautifulSoup(entry.content[0].value, "html.parser")
+                img = soup.find("img")
+                if img and img.get("src"):
+                    image_url = img["src"]
+            
+            items.append({
+                "id": f"dribbble_{entry.get('id','')}",
+                "title": title,
+                "url": entry.get("link",""),
+                "source": "Dribbble",
+                "summary": "",
+                "image_url": image_url,
+                "words": extract_words(title),
+                "category": "design"
+            })
+    except Exception as e:
+        print(f"Dribbble error: {e}")
     return items
 
 async def fetch_all():
     results = await asyncio.gather(
-        fetch_hn(), fetch_habr(), fetch_devto(), 
-        fetch_github_trending(), fetch_art(),
+        fetch_unsplash(), fetch_pexels(), fetch_colossal(),
+        fetch_itsnicethat(), fetch_awwwards(), fetch_dribbble(),
         return_exceptions=True
     )
     items = []
@@ -141,5 +202,3 @@ async def fetch_all():
         if isinstance(r, list):
             items.extend(r)
     return items
-
-import asyncio
